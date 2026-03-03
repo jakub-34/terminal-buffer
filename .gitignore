@@ -1,0 +1,52 @@
+# --- Build & Dependency Management ---
+.gradle/
+build/
+bin/
+out/
+target/
+.kotlin/
+.nb-gradle/
+
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+!**/src/main/**/out/
+!**/src/test/**/out/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+# --- IntelliJ IDEA ---
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# --- Eclipse ---
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+# --- NetBeans ---
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+
+# --- VS Code ---
+.vscode/
+
+# --- Operačný systém & Logy ---
+.DS_Store
+Thumbs.db
+*.log
+.pnpm-debug.log*
+.yarn-debug.log*
+.npm-debug.log*
+
+# --- Others ---
+.env
+.env.local
