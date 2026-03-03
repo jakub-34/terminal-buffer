@@ -32,7 +32,32 @@ public class BufferLine {
         if (cell == null) {
             throw new NullPointerException("cell must not be null");
         }
-        cells[col] = cell;
+
+        // If we're overwriting the right half of a wide char, clear the left half
+        if (col > 0 && cells[col].isContinuation()) {
+            cells[col - 1] = Cell.EMPTY;
+        }
+
+        // If we're overwriting the left half of a wide char, clear the right half
+        if (cells[col].isWide() && col + 1 < cells.length) {
+            cells[col + 1] = Cell.EMPTY;
+        }
+
+        if (cell.isWide()) {
+            if (col + 1 >= cells.length) {
+                // Wide char doesn't fit at end of line — place empty instead
+                cells[col] = Cell.EMPTY;
+                return;
+            }
+            // If the continuation cell would overwrite the left half of another wide char
+            if (cells[col + 1].isWide() && col + 2 < cells.length) {
+                cells[col + 2] = Cell.EMPTY;
+            }
+            cells[col] = cell;
+            cells[col + 1] = Cell.CONTINUATION;
+        } else {
+            cells[col] = cell;
+        }
     }
 
     /**
@@ -97,10 +122,14 @@ public class BufferLine {
     /**
      * Returns the line content as a string.
      * Empty cells ({@code '\0'}) are replaced with spaces.
+     * Continuation cells (right half of wide chars) are skipped.
      */
     public String getContentAsString() {
         StringBuilder sb = new StringBuilder(cells.length);
         for (Cell cell : cells) {
+            if (cell.isContinuation()) {
+                continue;
+            }
             sb.append(cell.isEmpty() ? ' ' : cell.character());
         }
         return sb.toString();

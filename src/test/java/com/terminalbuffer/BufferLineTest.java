@@ -285,5 +285,98 @@ class BufferLineTest {
         assertEquals('D', line.getCell(3).character());
         assertTrue(line.getCell(4).isEmpty());
     }
+
+    // --- Wide character support ---
+
+    @Test
+    void setCellWideShouldOccupyTwoCells() {
+        BufferLine line = new BufferLine(10);
+        Cell wide = new Cell('中', CellAttributes.DEFAULT, 2);
+        line.setCell(3, wide);
+
+        assertEquals('中', line.getCell(3).character());
+        assertEquals(2, line.getCell(3).width());
+        assertTrue(line.getCell(4).isContinuation());
+    }
+
+    @Test
+    void wideCellAtEndOfLineShouldBeReplacedWithEmpty() {
+        BufferLine line = new BufferLine(5);
+        Cell wide = new Cell('中', CellAttributes.DEFAULT, 2);
+        line.setCell(4, wide); // doesn't fit — only 1 cell left
+        assertTrue(line.getCell(4).isEmpty());
+    }
+
+    @Test
+    void overwritingContinuationShouldClearWideChar() {
+        BufferLine line = new BufferLine(10);
+        Cell wide = new Cell('中', CellAttributes.DEFAULT, 2);
+        line.setCell(3, wide);
+
+        // Overwrite the continuation cell at position 4
+        line.setCell(4, new Cell('X', CellAttributes.DEFAULT));
+
+        // The left half (position 3) should be cleared
+        assertTrue(line.getCell(3).isEmpty());
+        assertEquals('X', line.getCell(4).character());
+    }
+
+    @Test
+    void overwritingWideCharLeftHalfShouldClearContinuation() {
+        BufferLine line = new BufferLine(10);
+        Cell wide = new Cell('中', CellAttributes.DEFAULT, 2);
+        line.setCell(3, wide);
+
+        // Overwrite the left half at position 3
+        line.setCell(3, new Cell('Y', CellAttributes.DEFAULT));
+
+        assertEquals('Y', line.getCell(3).character());
+        // The continuation at position 4 should be cleared
+        assertTrue(line.getCell(4).isEmpty());
+    }
+
+    @Test
+    void getContentAsStringShouldSkipContinuationCells() {
+        BufferLine line = new BufferLine(6);
+        line.writeString(0, "A", CellAttributes.DEFAULT);
+        Cell wide = new Cell('中', CellAttributes.DEFAULT, 2);
+        line.setCell(1, wide);
+        line.writeString(3, "B", CellAttributes.DEFAULT);
+
+        String content = line.getContentAsString();
+        // A + 中 + B + spaces (2 continuation-free empties)
+        assertEquals("A中B  ", content);
+    }
+
+    @Test
+    void adjacentWideCharsShouldWorkCorrectly() {
+        BufferLine line = new BufferLine(6);
+        Cell wide1 = new Cell('中', CellAttributes.DEFAULT, 2);
+        Cell wide2 = new Cell('文', CellAttributes.DEFAULT, 2);
+        line.setCell(0, wide1);
+        line.setCell(2, wide2);
+
+        assertEquals('中', line.getCell(0).character());
+        assertTrue(line.getCell(1).isContinuation());
+        assertEquals('文', line.getCell(2).character());
+        assertTrue(line.getCell(3).isContinuation());
+
+        assertEquals("中文  ", line.getContentAsString());
+    }
+
+    @Test
+    void wideCharOverwritingAnotherWideCharShouldCleanUp() {
+        BufferLine line = new BufferLine(6);
+        Cell wide1 = new Cell('中', CellAttributes.DEFAULT, 2);
+        line.setCell(1, wide1); // occupies cells 1-2
+
+        Cell wide2 = new Cell('文', CellAttributes.DEFAULT, 2);
+        line.setCell(2, wide2); // overlaps continuation of first wide char
+
+        // Cell 1 (was left half of wide1) should be cleared
+        assertTrue(line.getCell(1).isEmpty());
+        assertEquals('文', line.getCell(2).character());
+        assertTrue(line.getCell(3).isContinuation());
+    }
 }
 
