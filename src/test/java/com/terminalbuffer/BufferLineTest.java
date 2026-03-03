@@ -1,0 +1,289 @@
+package com.terminalbuffer;
+
+import org.junit.jupiter.api.Test;
+
+import java.util.EnumSet;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class BufferLineTest {
+
+    @Test
+    void newLineShouldHaveCorrectWidth() {
+        BufferLine line = new BufferLine(80);
+        assertEquals(80, line.getWidth());
+    }
+
+    @Test
+    void newLineShouldBeFilledWithEmptyCells() {
+        BufferLine line = new BufferLine(10);
+        for (int i = 0; i < 10; i++) {
+            assertEquals(Cell.EMPTY, line.getCell(i));
+            assertTrue(line.getCell(i).isEmpty());
+        }
+    }
+
+    @Test
+    void shouldRejectZeroWidth() {
+        assertThrows(IllegalArgumentException.class, () -> new BufferLine(0));
+    }
+
+    @Test
+    void shouldRejectNegativeWidth() {
+        assertThrows(IllegalArgumentException.class, () -> new BufferLine(-1));
+    }
+
+    // --- setCell / getCell ---
+
+    @Test
+    void setCellAndGetCellShouldRoundTrip() {
+        BufferLine line = new BufferLine(10);
+        Cell cell = new Cell('A', CellAttributes.DEFAULT);
+        line.setCell(3, cell);
+        assertEquals(cell, line.getCell(3));
+    }
+
+    @Test
+    void setCellShouldNotAffectOtherCells() {
+        BufferLine line = new BufferLine(5);
+        line.setCell(2, new Cell('X', CellAttributes.DEFAULT));
+        assertEquals(Cell.EMPTY, line.getCell(0));
+        assertEquals(Cell.EMPTY, line.getCell(1));
+        assertEquals(Cell.EMPTY, line.getCell(3));
+        assertEquals(Cell.EMPTY, line.getCell(4));
+    }
+
+    @Test
+    void getCellShouldRejectNegativeIndex() {
+        BufferLine line = new BufferLine(10);
+        assertThrows(IndexOutOfBoundsException.class, () -> line.getCell(-1));
+    }
+
+    @Test
+    void getCellShouldRejectIndexAtWidth() {
+        BufferLine line = new BufferLine(10);
+        assertThrows(IndexOutOfBoundsException.class, () -> line.getCell(10));
+    }
+
+    @Test
+    void setCellShouldRejectNullCell() {
+        BufferLine line = new BufferLine(10);
+        assertThrows(NullPointerException.class, () -> line.setCell(0, null));
+    }
+
+    // --- writeString ---
+
+    @Test
+    void writeStringShouldWriteCharactersWithAttributes() {
+        BufferLine line = new BufferLine(10);
+        CellAttributes attrs = new CellAttributes(Color.RED, Color.DEFAULT, EnumSet.noneOf(Style.class));
+        int written = line.writeString(0, "Hello", attrs);
+
+        assertEquals(5, written);
+        assertEquals('H', line.getCell(0).character());
+        assertEquals('e', line.getCell(1).character());
+        assertEquals('l', line.getCell(2).character());
+        assertEquals('l', line.getCell(3).character());
+        assertEquals('o', line.getCell(4).character());
+        assertEquals(attrs, line.getCell(0).attributes());
+    }
+
+    @Test
+    void writeStringShouldStartAtGivenColumn() {
+        BufferLine line = new BufferLine(10);
+        line.writeString(5, "AB", CellAttributes.DEFAULT);
+        assertEquals(Cell.EMPTY, line.getCell(4));
+        assertEquals('A', line.getCell(5).character());
+        assertEquals('B', line.getCell(6).character());
+        assertEquals(Cell.EMPTY, line.getCell(7));
+    }
+
+    @Test
+    void writeStringShouldTruncateAtLineWidth() {
+        BufferLine line = new BufferLine(5);
+        int written = line.writeString(3, "ABCDE", CellAttributes.DEFAULT);
+
+        assertEquals(2, written);
+        assertEquals('A', line.getCell(3).character());
+        assertEquals('B', line.getCell(4).character());
+    }
+
+    @Test
+    void writeStringShouldOverwriteExistingContent() {
+        BufferLine line = new BufferLine(10);
+        line.writeString(0, "AAAAA", CellAttributes.DEFAULT);
+        line.writeString(1, "BB", CellAttributes.DEFAULT);
+        assertEquals('A', line.getCell(0).character());
+        assertEquals('B', line.getCell(1).character());
+        assertEquals('B', line.getCell(2).character());
+        assertEquals('A', line.getCell(3).character());
+    }
+
+    @Test
+    void writeEmptyStringShouldWriteNothing() {
+        BufferLine line = new BufferLine(10);
+        int written = line.writeString(0, "", CellAttributes.DEFAULT);
+        assertEquals(0, written);
+        assertEquals(Cell.EMPTY, line.getCell(0));
+    }
+
+    @Test
+    void writeStringShouldRejectNullText() {
+        BufferLine line = new BufferLine(10);
+        assertThrows(NullPointerException.class, () -> line.writeString(0, null, CellAttributes.DEFAULT));
+    }
+
+    @Test
+    void writeStringShouldRejectNullAttributes() {
+        BufferLine line = new BufferLine(10);
+        assertThrows(NullPointerException.class, () -> line.writeString(0, "A", null));
+    }
+
+    // --- insertCells ---
+
+    @Test
+    void insertCellsShouldShiftContentRight() {
+        BufferLine line = new BufferLine(10);
+        line.writeString(0, "ABCDE", CellAttributes.DEFAULT);
+        line.insertCells(2, 3);
+
+        assertEquals('A', line.getCell(0).character());
+        assertEquals('B', line.getCell(1).character());
+        // positions 2-4 are now empty (inserted gap)
+        assertTrue(line.getCell(2).isEmpty());
+        assertTrue(line.getCell(3).isEmpty());
+        assertTrue(line.getCell(4).isEmpty());
+        // original C, D, E shifted to positions 5, 6, 7
+        assertEquals('C', line.getCell(5).character());
+        assertEquals('D', line.getCell(6).character());
+        assertEquals('E', line.getCell(7).character());
+    }
+
+    @Test
+    void insertCellsShouldDiscardOverflowingCells() {
+        BufferLine line = new BufferLine(5);
+        line.writeString(0, "ABCDE", CellAttributes.DEFAULT);
+        line.insertCells(1, 2);
+
+        assertEquals('A', line.getCell(0).character());
+        assertTrue(line.getCell(1).isEmpty());
+        assertTrue(line.getCell(2).isEmpty());
+        assertEquals('B', line.getCell(3).character());
+        assertEquals('C', line.getCell(4).character());
+        // D, E are lost
+    }
+
+    @Test
+    void insertZeroCellsShouldDoNothing() {
+        BufferLine line = new BufferLine(5);
+        line.writeString(0, "ABCDE", CellAttributes.DEFAULT);
+        line.insertCells(2, 0);
+        assertEquals("ABCDE", line.getContentAsString());
+    }
+
+    @Test
+    void insertCellsShouldRejectNegativeColumn() {
+        BufferLine line = new BufferLine(10);
+        assertThrows(IndexOutOfBoundsException.class, () -> line.insertCells(-1, 1));
+    }
+
+    // --- fill ---
+
+    @Test
+    void fillShouldSetAllCells() {
+        BufferLine line = new BufferLine(5);
+        CellAttributes attrs = new CellAttributes(Color.GREEN, Color.BLACK, EnumSet.of(Style.BOLD));
+        line.fill('X', attrs);
+        for (int i = 0; i < 5; i++) {
+            assertEquals('X', line.getCell(i).character());
+            assertEquals(attrs, line.getCell(i).attributes());
+        }
+    }
+
+    @Test
+    void fillWithNullCharShouldFillWithEmpty() {
+        BufferLine line = new BufferLine(5);
+        line.writeString(0, "ABCDE", CellAttributes.DEFAULT);
+        line.fill('\0', CellAttributes.DEFAULT);
+        for (int i = 0; i < 5; i++) {
+            assertTrue(line.getCell(i).isEmpty());
+        }
+    }
+
+    @Test
+    void fillShouldRejectNullAttributes() {
+        BufferLine line = new BufferLine(5);
+        assertThrows(NullPointerException.class, () -> line.fill('X', null));
+    }
+
+    // --- clear ---
+
+    @Test
+    void clearShouldResetAllCellsToEmpty() {
+        BufferLine line = new BufferLine(5);
+        line.writeString(0, "Hello", CellAttributes.DEFAULT);
+        line.clear();
+        for (int i = 0; i < 5; i++) {
+            assertEquals(Cell.EMPTY, line.getCell(i));
+        }
+    }
+
+    // --- getContentAsString ---
+
+    @Test
+    void getContentAsStringShouldReturnWrittenText() {
+        BufferLine line = new BufferLine(10);
+        line.writeString(0, "Hello", CellAttributes.DEFAULT);
+        assertEquals("Hello     ", line.getContentAsString());
+    }
+
+    @Test
+    void getContentAsStringShouldReplaceEmptyCellsWithSpaces() {
+        BufferLine line = new BufferLine(5);
+        assertEquals("     ", line.getContentAsString());
+    }
+
+    @Test
+    void getContentAsStringShouldHaveLengthEqualToWidth() {
+        BufferLine line = new BufferLine(80);
+        assertEquals(80, line.getContentAsString().length());
+    }
+
+    @Test
+    void getContentAsStringShouldReflectPartialWrites() {
+        BufferLine line = new BufferLine(10);
+        line.writeString(3, "AB", CellAttributes.DEFAULT);
+        assertEquals("   AB     ", line.getContentAsString());
+    }
+
+    // --- edge cases ---
+
+    @Test
+    void widthOneLine() {
+        BufferLine line = new BufferLine(1);
+        assertEquals(1, line.getWidth());
+        line.setCell(0, new Cell('X', CellAttributes.DEFAULT));
+        assertEquals('X', line.getCell(0).character());
+    }
+
+    @Test
+    void writeStringAtLastColumn() {
+        BufferLine line = new BufferLine(5);
+        int written = line.writeString(4, "XY", CellAttributes.DEFAULT);
+        assertEquals(1, written);
+        assertEquals('X', line.getCell(4).character());
+    }
+
+    @Test
+    void insertCellsAtEndOfLine() {
+        BufferLine line = new BufferLine(5);
+        line.writeString(0, "ABCDE", CellAttributes.DEFAULT);
+        line.insertCells(4, 2);
+        assertEquals('A', line.getCell(0).character());
+        assertEquals('B', line.getCell(1).character());
+        assertEquals('C', line.getCell(2).character());
+        assertEquals('D', line.getCell(3).character());
+        assertTrue(line.getCell(4).isEmpty());
+    }
+}
+
