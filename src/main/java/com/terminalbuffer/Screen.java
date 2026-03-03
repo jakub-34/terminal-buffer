@@ -9,8 +9,8 @@ import java.util.List;
  */
 public class Screen {
 
-    private final int width;
-    private final int height;
+    private int width;
+    private int height;
     private final List<BufferLine> lines;
 
     public Screen(int width, int height) {
@@ -59,6 +59,72 @@ public class Screen {
         for (BufferLine line : lines) {
             line.clear();
         }
+    }
+
+    /**
+     * Resizes the screen to the given dimensions.
+     * <p>
+     * Width change: each existing line is copied into a new line of the new width.
+     * Characters beyond the new width are truncated; extra space is filled with empty cells.
+     * <p>
+     * Height change: if shrinking, excess bottom lines are removed (returned for scrollback).
+     * If growing, new empty lines are appended at the bottom.
+     *
+     * @return lines removed from the top when shrinking height (empty list if growing or same)
+     */
+    public List<BufferLine> resize(int newWidth, int newHeight) {
+        if (newWidth <= 0) {
+            throw new IllegalArgumentException("newWidth must be positive, got: " + newWidth);
+        }
+        if (newHeight <= 0) {
+            throw new IllegalArgumentException("newHeight must be positive, got: " + newHeight);
+        }
+
+        List<BufferLine> removedLines = new ArrayList<>();
+
+        // Resize width of existing lines
+        if (newWidth != this.width) {
+            for (int i = 0; i < lines.size(); i++) {
+                lines.set(i, copyLineToWidth(lines.get(i), newWidth));
+            }
+        }
+
+        // Adjust height
+        if (newHeight < lines.size()) {
+            // Shrink: remove excess lines from the top (they go to scrollback)
+            int excess = lines.size() - newHeight;
+            for (int i = 0; i < excess; i++) {
+                removedLines.add(lines.removeFirst());
+            }
+        } else if (newHeight > lines.size()) {
+            // Grow: add empty lines at the bottom
+            int extra = newHeight - lines.size();
+            for (int i = 0; i < extra; i++) {
+                lines.add(new BufferLine(newWidth));
+            }
+        }
+
+        this.width = newWidth;
+        this.height = newHeight;
+        return removedLines;
+    }
+
+    private static BufferLine copyLineToWidth(BufferLine source, int newWidth) {
+        BufferLine newLine = new BufferLine(newWidth);
+        int copyWidth = Math.min(source.getWidth(), newWidth);
+        for (int c = 0; c < copyWidth; c++) {
+            Cell cell = source.getCell(c);
+            // If a wide char's continuation would be cut off, replace with empty
+            if (cell.isWide() && c + 1 >= newWidth) {
+                newLine.setCell(c, Cell.EMPTY);
+            } else if (cell.isContinuation() && (c == 0 || !source.getCell(c - 1).isWide())) {
+                // Orphaned continuation cell
+                newLine.setCell(c, Cell.EMPTY);
+            } else {
+                newLine.setCell(c, cell);
+            }
+        }
+        return newLine;
     }
 
     private void validateRow(int row) {
