@@ -78,5 +78,52 @@ class CellTest {
         String str = cell.toString();
         assertTrue(str.contains("H"));
     }
+
+    // --- Width ---
+
+    @Test
+    void defaultWidthShouldBeOne() {
+        Cell cell = new Cell('A', CellAttributes.DEFAULT);
+        assertEquals(1, cell.width());
+        assertFalse(cell.isWide());
+        assertFalse(cell.isContinuation());
+    }
+
+    @Test
+    void emptyCellShouldHaveWidthOne() {
+        assertEquals(1, Cell.EMPTY.width());
+        assertFalse(Cell.EMPTY.isContinuation());
+    }
+
+    @Test
+    void wideCellShouldHaveWidthTwo() {
+        Cell cell = new Cell('中', CellAttributes.DEFAULT, 2);
+        assertEquals(2, cell.width());
+        assertTrue(cell.isWide());
+        assertFalse(cell.isContinuation());
+        assertFalse(cell.isEmpty());
+    }
+
+    @Test
+    void continuationCellShouldHaveWidthZero() {
+        Cell cell = Cell.CONTINUATION;
+        assertEquals(0, cell.width());
+        assertTrue(cell.isContinuation());
+        assertFalse(cell.isWide());
+        assertFalse(cell.isEmpty()); // continuation is not "empty" in the normal sense
+    }
+
+    @Test
+    void shouldRejectInvalidWidth() {
+        assertThrows(IllegalArgumentException.class, () -> new Cell('A', CellAttributes.DEFAULT, -1));
+        assertThrows(IllegalArgumentException.class, () -> new Cell('A', CellAttributes.DEFAULT, 3));
+    }
+
+    @Test
+    void cellsWithDifferentWidthsShouldNotBeEqual() {
+        Cell normal = new Cell('A', CellAttributes.DEFAULT, 1);
+        Cell wide = new Cell('A', CellAttributes.DEFAULT, 2);
+        assertNotEquals(normal, wide);
+    }
 }
 
