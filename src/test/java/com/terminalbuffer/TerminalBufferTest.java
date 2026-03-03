@@ -370,6 +370,218 @@ class TerminalBufferTest {
         assertEquals(5, buf.getCursorRow());
         assertEquals(10, buf.getCursorCol());
     }
+
+    // --- Content Access: getCharAt / getAttributesAt ---
+
+    @Test
+    void getCharAtShouldReturnWrittenCharacter() {
+        buf.writeString("Hello");
+        assertEquals('H', buf.getCharAt(0, 0));
+        assertEquals('e', buf.getCharAt(0, 1));
+        assertEquals('o', buf.getCharAt(0, 4));
+    }
+
+    @Test
+    void getCharAtShouldReturnNullCharForEmptyCell() {
+        assertEquals('\0', buf.getCharAt(0, 0));
+    }
+
+    @Test
+    void getCharAtShouldRejectOutOfBounds() {
+        assertThrows(IndexOutOfBoundsException.class, () -> buf.getCharAt(-1, 0));
+        assertThrows(IndexOutOfBoundsException.class, () -> buf.getCharAt(24, 0));
+        assertThrows(IndexOutOfBoundsException.class, () -> buf.getCharAt(0, -1));
+        assertThrows(IndexOutOfBoundsException.class, () -> buf.getCharAt(0, 80));
+    }
+
+    @Test
+    void getAttributesAtShouldReturnCurrentAttributesUsedDuringWrite() {
+        CellAttributes attrs = new CellAttributes(Color.GREEN, Color.BLACK, EnumSet.of(Style.ITALIC));
+        buf.setCurrentAttributes(attrs);
+        buf.writeChar('X');
+        assertEquals(attrs, buf.getAttributesAt(0, 0));
+    }
+
+    @Test
+    void getAttributesAtShouldReturnDefaultForEmptyCell() {
+        assertEquals(CellAttributes.DEFAULT, buf.getAttributesAt(0, 0));
+    }
+
+    // --- Content Access: getLine / getLineAsString ---
+
+    @Test
+    void getLineShouldReturnBufferLine() {
+        buf.writeString("Test");
+        BufferLine line = buf.getLine(0);
+        assertNotNull(line);
+        assertEquals('T', line.getCell(0).character());
+    }
+
+    @Test
+    void getLineAsStringShouldReturnLineContent() {
+        buf.writeString("Hello");
+        String lineStr = buf.getLineAsString(0);
+        assertTrue(lineStr.startsWith("Hello"));
+        assertEquals(80, lineStr.length());
+    }
+
+    @Test
+    void getLineAsStringShouldPadWithSpaces() {
+        buf.writeString("AB");
+        assertEquals(80, buf.getLineAsString(0).length());
+        assertTrue(buf.getLineAsString(0).startsWith("AB"));
+    }
+
+    // --- Content Access: getScreenContent ---
+
+    @Test
+    void getScreenContentShouldJoinLinesWithNewlines() {
+        buf.writeString("Hello");
+        buf.setCursorPosition(1, 0);
+        buf.writeString("World");
+
+        String content = buf.getScreenContent();
+        String[] lines = content.split("\n", -1);
+        assertEquals(24, lines.length);
+        assertTrue(lines[0].startsWith("Hello"));
+        assertTrue(lines[1].startsWith("World"));
+    }
+
+    @Test
+    void getScreenContentOnEmptyBufferShouldBeAllSpaces() {
+        String content = buf.getScreenContent();
+        String[] lines = content.split("\n", -1);
+        assertEquals(24, lines.length);
+        for (String line : lines) {
+            assertEquals(80, line.length());
+            assertTrue(line.isBlank());
+        }
+    }
+
+    @Test
+    void getScreenContentShouldReflectClearScreen() {
+        buf.writeString("Something");
+        buf.clearScreen();
+        String content = buf.getScreenContent();
+        for (String line : content.split("\n", -1)) {
+            assertTrue(line.isBlank());
+        }
+    }
+
+    // --- Content Access: getAllContent ---
+
+    @Test
+    void getAllContentWithoutScrollbackShouldEqualScreenContent() {
+        buf.writeString("Hello");
+        assertEquals(buf.getScreenContent(), buf.getAllContent());
+    }
+
+    @Test
+    void getAllContentShouldIncludeScrollbackAndScreen() {
+        TerminalBuffer small = new TerminalBuffer(3, 2, 10);
+        small.writeString("AAABBBCCC");
+        // AAA, BBB scrolled out; screen row 0 = CCC, row 1 = empty
+
+        String all = small.getAllContent();
+        String[] lines = all.split("\n", -1);
+        assertEquals(4, lines.length); // 2 scrollback + 2 screen
+        assertEquals("AAA", lines[0]);
+        assertEquals("BBB", lines[1]);
+        assertEquals("CCC", lines[2]);
+        assertEquals("   ", lines[3]); // empty screen row
+    }
+
+    @Test
+    void getAllContentShouldShowMultipleScrollbackLines() {
+        TerminalBuffer small = new TerminalBuffer(3, 2, 100);
+        small.writeString("AAABBBCCCDDD");
+        // 4 full rows, height=2 → 3 in scrollback, screen has DDD + empty
+
+        String all = small.getAllContent();
+        String[] lines = all.split("\n", -1);
+        assertEquals(5, lines.length); // 3 scrollback + 2 screen
+        assertEquals("AAA", lines[0]);
+        assertEquals("BBB", lines[1]);
+        assertEquals("CCC", lines[2]);
+        assertEquals("DDD", lines[3]);
+    }
+
+    // --- Content Access: scrollback content ---
+
+    @Test
+    void getScrollbackCharAtShouldReturnCorrectChar() {
+        TerminalBuffer small = new TerminalBuffer(3, 2, 10);
+        small.writeString("AAABBB");
+        // AAA scrolled out
+
+        assertEquals('A', small.getScrollbackCharAt(0, 0));
+        assertEquals('A', small.getScrollbackCharAt(0, 2));
+    }
+
+    @Test
+    void getScrollbackAttributesAtShouldReturnCorrectAttributes() {
+        CellAttributes attrs = new CellAttributes(Color.RED, Color.BLUE, EnumSet.of(Style.BOLD));
+        TerminalBuffer small = new TerminalBuffer(3, 2, 10);
+        small.setCurrentAttributes(attrs);
+        small.writeString("AAABBB");
+
+        assertEquals(attrs, small.getScrollbackAttributesAt(0, 0));
+    }
+
+    @Test
+    void getScrollbackLineAsStringShouldReturnCorrectContent() {
+        TerminalBuffer small = new TerminalBuffer(3, 2, 10);
+        small.writeString("AAABBB");
+
+        assertEquals("AAA", small.getScrollbackLineAsString(0));
+    }
+
+    @Test
+    void scrollbackContentAccessShouldRejectOutOfBounds() {
+        assertThrows(IndexOutOfBoundsException.class, () -> buf.getScrollbackCharAt(0, 0));
+        assertThrows(IndexOutOfBoundsException.class, () -> buf.getScrollbackAttributesAt(0, 0));
+        assertThrows(IndexOutOfBoundsException.class, () -> buf.getScrollbackLineAsString(0));
+    }
+
+    // --- Content Access: fillLine verification ---
+
+    @Test
+    void fillLineShouldBeVisibleViaGetCharAt() {
+        CellAttributes attrs = new CellAttributes(Color.RED, Color.DEFAULT, EnumSet.noneOf(Style.class));
+        buf.setCurrentAttributes(attrs);
+        buf.fillLine(0, '#');
+
+        for (int c = 0; c < 80; c++) {
+            assertEquals('#', buf.getCharAt(0, c));
+            assertEquals(attrs, buf.getAttributesAt(0, c));
+        }
+    }
+
+    // --- Content Access: write verification ---
+
+    @Test
+    void writeShouldBeVisibleViaGetCharAt() {
+        buf.write("Hello");
+        assertEquals('H', buf.getCharAt(0, 0));
+        assertEquals('e', buf.getCharAt(0, 1));
+        assertEquals('l', buf.getCharAt(0, 2));
+        assertEquals('l', buf.getCharAt(0, 3));
+        assertEquals('o', buf.getCharAt(0, 4));
+        assertEquals('\0', buf.getCharAt(0, 5));
+    }
+
+    // --- Content Access: insert verification ---
+
+    @Test
+    void insertShouldBeVisibleViaGetLineAsString() {
+        TerminalBuffer small = new TerminalBuffer(10, 2, 10);
+        small.write("ABCDE");
+        small.setCursorPosition(0, 2);
+        small.insert("XX");
+
+        String line = small.getLineAsString(0);
+        assertTrue(line.startsWith("ABXXCDE"));
+    }
 }
 
 

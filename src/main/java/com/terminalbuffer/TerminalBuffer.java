@@ -172,6 +172,102 @@ public class TerminalBuffer {
         scrollback.clear();
     }
 
+    // --- Content Access ---
+
+    /**
+     * Returns the character at the given screen position.
+     * Empty cells return {@code '\0'}.
+     */
+    public char getCharAt(int row, int col) {
+        return screen.getLine(row).getCell(col).character();
+    }
+
+    /**
+     * Returns the attributes at the given screen position.
+     */
+    public CellAttributes getAttributesAt(int row, int col) {
+        return screen.getLine(row).getCell(col).attributes();
+    }
+
+    /**
+     * Returns the screen line at the given row.
+     */
+    public BufferLine getLine(int row) {
+        return screen.getLine(row);
+    }
+
+    /**
+     * Returns the content of a single screen line as a string.
+     */
+    public String getLineAsString(int row) {
+        return screen.getLine(row).getContentAsString();
+    }
+
+    /**
+     * Returns the entire screen content as a string, with lines joined by newlines.
+     */
+    public String getScreenContent() {
+        StringBuilder sb = new StringBuilder();
+        for (int r = 0; r < screen.getHeight(); r++) {
+            if (r > 0) {
+                sb.append('\n');
+            }
+            sb.append(screen.getLine(r).getContentAsString());
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Returns the entire content (scrollback + screen) as a string,
+     * with lines joined by newlines.
+     */
+    public String getAllContent() {
+        StringBuilder sb = new StringBuilder();
+        List<BufferLine> scrollbackLines = scrollback.getLines();
+        for (int i = 0; i < scrollbackLines.size(); i++) {
+            if (i > 0) {
+                sb.append('\n');
+            }
+            sb.append(scrollbackLines.get(i).getContentAsString());
+        }
+        for (int r = 0; r < screen.getHeight(); r++) {
+            if (!sb.isEmpty()) {
+                sb.append('\n');
+            }
+            sb.append(screen.getLine(r).getContentAsString());
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Returns the character at the given position in scrollback.
+     *
+     * @param index line index within scrollback (0 = oldest)
+     * @param col   column position
+     */
+    public char getScrollbackCharAt(int index, int col) {
+        return scrollback.getLine(index).getCell(col).character();
+    }
+
+    /**
+     * Returns the attributes at the given position in scrollback.
+     *
+     * @param index line index within scrollback (0 = oldest)
+     * @param col   column position
+     */
+    public CellAttributes getScrollbackAttributesAt(int index, int col) {
+        return scrollback.getLine(index).getCell(col).attributes();
+    }
+
+    /**
+     * Returns a scrollback line as a string.
+     *
+     * @param index line index within scrollback (0 = oldest)
+     */
+    public String getScrollbackLineAsString(int index) {
+        return scrollback.getLine(index).getContentAsString();
+    }
+
     // --- Scrollback ---
 
     public List<BufferLine> getScrollback() {
