@@ -8,8 +8,8 @@ public class Cursor {
 
     private int row;
     private int col;
-    private final int maxRow;
-    private final int maxCol;
+    private int maxRow;
+    private int maxCol;
 
     public Cursor(int screenHeight, int screenWidth) {
         if (screenHeight <= 0) {
@@ -72,13 +72,43 @@ public class Cursor {
         return false;
     }
 
+    /**
+     * Advances the cursor by {@code n} positions to the right.
+     *
+     * @return the number of scrolls needed (0 or more)
+     */
+    public int advanceBy(int n) {
+        int scrolls = 0;
+        for (int i = 0; i < n; i++) {
+            if (advance()) {
+                scrolls++;
+            }
+        }
+        return scrolls;
+    }
+
     public void reset() {
         row = 0;
         col = 0;
+    }
+
+    /**
+     * Updates the screen bounds. Clamps the cursor to the new bounds.
+     */
+    public void updateBounds(int screenHeight, int screenWidth) {
+        if (screenHeight <= 0) {
+            throw new IllegalArgumentException("screenHeight must be positive, got: " + screenHeight);
+        }
+        if (screenWidth <= 0) {
+            throw new IllegalArgumentException("screenWidth must be positive, got: " + screenWidth);
+        }
+        this.maxRow = screenHeight - 1;
+        this.maxCol = screenWidth - 1;
+        this.row = clamp(this.row, 0, this.maxRow);
+        this.col = clamp(this.col, 0, this.maxCol);
     }
 
     private static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(value, max));
     }
 }
-

@@ -179,5 +179,64 @@ class CursorTest {
         assertEquals(0, cursor.getRow());
         assertEquals(0, cursor.getCol());
     }
+
+    // --- advanceBy ---
+
+    @Test
+    void advanceByShouldAdvanceMultiplePositions() {
+        Cursor cursor = new Cursor(24, 80);
+        int scrolls = cursor.advanceBy(5);
+        assertEquals(0, scrolls);
+        assertEquals(0, cursor.getRow());
+        assertEquals(5, cursor.getCol());
+    }
+
+    @Test
+    void advanceByShouldWrapAndCountScrolls() {
+        Cursor cursor = new Cursor(2, 3);
+        cursor.setPosition(1, 1);
+        // positions left: (1,1)->(1,2)->(scroll, 1,0)->(1,1)->(1,2)->(scroll, 1,0)
+        int scrolls = cursor.advanceBy(4);
+        assertEquals(1, scrolls);
+        assertEquals(1, cursor.getRow());
+        assertEquals(2, cursor.getCol());
+    }
+
+    @Test
+    void advanceByZeroShouldDoNothing() {
+        Cursor cursor = new Cursor(24, 80);
+        cursor.setPosition(5, 10);
+        int scrolls = cursor.advanceBy(0);
+        assertEquals(0, scrolls);
+        assertEquals(5, cursor.getRow());
+        assertEquals(10, cursor.getCol());
+    }
+
+    // --- updateBounds ---
+
+    @Test
+    void updateBoundsShouldClampCursor() {
+        Cursor cursor = new Cursor(24, 80);
+        cursor.setPosition(20, 70);
+        cursor.updateBounds(10, 40);
+        assertEquals(9, cursor.getRow());
+        assertEquals(39, cursor.getCol());
+    }
+
+    @Test
+    void updateBoundsShouldNotMoveCursorIfWithinBounds() {
+        Cursor cursor = new Cursor(24, 80);
+        cursor.setPosition(5, 10);
+        cursor.updateBounds(50, 100);
+        assertEquals(5, cursor.getRow());
+        assertEquals(10, cursor.getCol());
+    }
+
+    @Test
+    void updateBoundsShouldRejectInvalidValues() {
+        Cursor cursor = new Cursor(24, 80);
+        assertThrows(IllegalArgumentException.class, () -> cursor.updateBounds(0, 80));
+        assertThrows(IllegalArgumentException.class, () -> cursor.updateBounds(24, 0));
+    }
 }
 
