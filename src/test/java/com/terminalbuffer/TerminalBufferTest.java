@@ -582,6 +582,167 @@ class TerminalBufferTest {
         String line = small.getLineAsString(0);
         assertTrue(line.startsWith("ABXXCDE"));
     }
+
+    // --- Wide characters ---
+
+    @Test
+    void writeCharShouldDetectWideCharacter() {
+        TerminalBuffer small = new TerminalBuffer(10, 2, 10);
+        small.writeChar('中'); // CJK ideograph — wide
+
+        assertEquals('中', small.getCharAt(0, 0));
+        assertEquals(2, small.getLine(0).getCell(0).width());
+        assertTrue(small.getLine(0).getCell(1).isContinuation());
+        assertEquals(0, small.getCursorRow());
+        assertEquals(2, small.getCursorCol());
+    }
+
+    @Test
+    void writeStringWithWideCharsShouldAdvanceCursorByTwo() {
+        TerminalBuffer small = new TerminalBuffer(10, 2, 10);
+        small.writeString("A中B");
+        // A=1 cell, 中=2 cells, B=1 cell → total 4 cells
+        assertEquals(0, small.getCursorRow());
+        assertEquals(4, small.getCursorCol());
+    }
+
+    @Test
+    void wideCharAtEndOfLineShouldWrapToNextLine() {
+        TerminalBuffer small = new TerminalBuffer(5, 3, 10);
+        small.setCursorPosition(0, 4);
+        small.writeChar('中'); // doesn't fit in 1 remaining cell
+
+        // Position 4 on row 0 should be empty (padding)
+        assertTrue(small.getLine(0).getCell(4).isEmpty());
+        // Wide char should be on row 1
+        assertEquals('中', small.getCharAt(1, 0));
+        assertTrue(small.getLine(1).getCell(1).isContinuation());
+        assertEquals(1, small.getCursorRow());
+        assertEquals(2, small.getCursorCol());
+    }
+
+    @Test
+    void wideCharContentShouldAppearInGetLineAsString() {
+        TerminalBuffer small = new TerminalBuffer(10, 2, 10);
+        small.writeString("A中B");
+        String line = small.getLineAsString(0);
+        assertTrue(line.startsWith("A中B"));
+    }
+
+    @Test
+    void mixedNarrowAndWideCharsShouldWorkCorrectly() {
+        TerminalBuffer small = new TerminalBuffer(8, 2, 10);
+        small.writeString("Hi中文!");
+        // H=1, i=1, 中=2, 文=2, !=1 → total 7 cells
+        assertEquals(0, small.getCursorRow());
+        assertEquals(7, small.getCursorCol());
+        String line = small.getLineAsString(0);
+        assertTrue(line.startsWith("Hi中文!"));
+    }
+
+    @Test
+    void isWideCharacterShouldDetectCJK() {
+        assertTrue(TerminalBuffer.isWideCharacter('中'));
+        assertTrue(TerminalBuffer.isWideCharacter('文'));
+        assertTrue(TerminalBuffer.isWideCharacter('字'));
+        assertFalse(TerminalBuffer.isWideCharacter('A'));
+        assertFalse(TerminalBuffer.isWideCharacter(' '));
+        assertFalse(TerminalBuffer.isWideCharacter('!'));
+    }
+
+    // --- Resize ---
+
+    @Test
+    void resizeShouldChangeWidthAndHeight() {
+        buf.resize(40, 12);
+        assertEquals(40, buf.getWidth());
+        assertEquals(12, buf.getHeight());
+    }
+
+    @Test
+    void resizeGrowShouldPreserveContent() {
+        TerminalBuffer small = new TerminalBuffer(5, 2, 10);
+        small.writeString("Hello");
+        small.resize(10, 4);
+
+        assertEquals(10, small.getWidth());
+        assertEquals(4, small.getHeight());
+        assertTrue(small.getLineAsString(0).startsWith("Hello"));
+    }
+
+    @Test
+    void resizeShrinkWidthShouldTruncateContent() {
+        TerminalBuffer small = new TerminalBuffer(10, 2, 10);
+        small.writeString("ABCDEFGHIJ");
+        small.resize(5, 2);
+
+        assertEquals("ABCDE", small.getLineAsString(0));
+    }
+
+    @Test
+    void resizeShrinkHeightShouldPushLinesToScrollback() {
+        TerminalBuffer small = new TerminalBuffer(5, 4, 10);
+        small.setCursorPosition(0, 0);
+        small.write("AAAAA");
+        small.setCursorPosition(1, 0);
+        small.write("BBBBB");
+        small.setCursorPosition(2, 0);
+        small.write("CCCCC");
+        small.setCursorPosition(3, 0);
+        small.write("DDDDD");
+
+        assertEquals(0, small.getScrollbackSize()); // no scrollback yet
+
+        small.resize(5, 2);
+
+        assertEquals(2, small.getScrollbackSize());
+        assertEquals("AAAAA", small.getScrollbackLineAsString(0));
+        assertEquals("BBBBB", small.getScrollbackLineAsString(1));
+        assertEquals("CCCCC", small.getLineAsString(0));
+        assertEquals("DDDDD", small.getLineAsString(1));
+    }
+
+    @Test
+    void resizeShouldClampCursor() {
+        buf.setCursorPosition(20, 70);
+        buf.resize(40, 10);
+        assertEquals(9, buf.getCursorRow());
+        assertEquals(39, buf.getCursorCol());
+    }
+
+    @Test
+    void resizeShouldNotMoveCursorIfWithinBounds() {
+        buf.setCursorPosition(5, 10);
+        buf.resize(80, 24);
+        assertEquals(5, buf.getCursorRow());
+        assertEquals(10, buf.getCursorCol());
+    }
+
+    @Test
+    void resizeGrowHeightShouldAddEmptyLines() {
+        TerminalBuffer small = new TerminalBuffer(5, 2, 10);
+        small.writeString("Hello");
+        small.resize(5, 4);
+
+        assertEquals(4, small.getHeight());
+        assertTrue(small.getLineAsString(0).startsWith("Hello"));
+        assertTrue(small.getLineAsString(2).isBlank());
+        assertTrue(small.getLineAsString(3).isBlank());
+    }
+
+    @Test
+    void resizeShrinkHeightShouldRespectMaxScrollback() {
+        TerminalBuffer small = new TerminalBuffer(3, 5, 2);
+        for (int i = 0; i < 5; i++) {
+            small.setCursorPosition(i, 0);
+            small.writeString(String.valueOf(i).repeat(3));
+        }
+
+        small.resize(3, 2);
+
+        // 3 lines removed from top, but max scrollback is 2
+        assertEquals(2, small.getScrollbackSize());
+    }
 }
 
 

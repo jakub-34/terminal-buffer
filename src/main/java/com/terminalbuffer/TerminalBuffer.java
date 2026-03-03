@@ -85,13 +85,32 @@ public class TerminalBuffer {
 
     /**
      * Writes a single character at the cursor position with current attributes.
+     * Detects wide characters (CJK ideographs, etc.) and occupies 2 cells.
      * Advances the cursor to the right. Wraps to the next line at end of line.
      * Scrolls the screen if the cursor moves past the last row.
      */
     public void writeChar(char c) {
-        screen.getLine(cursor.getRow()).setCell(cursor.getCol(), new Cell(c, currentAttributes));
-        if (cursor.advance()) {
-            scrollback.addLine(screen.scroll());
+        int charWidth = isWideCharacter(c) ? 2 : 1;
+
+        if (charWidth == 2) {
+            // If wide char doesn't fit at end of current line, pad with empty and wrap
+            if (cursor.getCol() + 1 >= getWidth()) {
+                screen.getLine(cursor.getRow()).setCell(cursor.getCol(), Cell.EMPTY);
+                if (cursor.advance()) {
+                    scrollback.addLine(screen.scroll());
+                }
+            }
+            Cell wideCell = new Cell(c, currentAttributes, 2);
+            screen.getLine(cursor.getRow()).setCell(cursor.getCol(), wideCell);
+            int scrolls = cursor.advanceBy(2);
+            for (int i = 0; i < scrolls; i++) {
+                scrollback.addLine(screen.scroll());
+            }
+        } else {
+            screen.getLine(cursor.getRow()).setCell(cursor.getCol(), new Cell(c, currentAttributes));
+            if (cursor.advance()) {
+                scrollback.addLine(screen.scroll());
+            }
         }
     }
 
@@ -276,6 +295,34 @@ public class TerminalBuffer {
 
     public int getScrollbackSize() {
         return scrollback.size();
+    }
+
+    // --- Resize ---
+
+    /**
+     * Resizes the terminal buffer to new dimensions.
+     * <p>
+     * Lines wider than the new width are truncated. Lines shorter are padded with empty cells.
+     * If height shrinks, excess top lines are pushed to scrollback.
+     * If height grows, new empty lines are added at the bottom.
+     * The cursor is clamped to the new bounds.
+     */
+    public void resize(int newWidth, int newHeight) {
+        List<BufferLine> removedLines = screen.resize(newWidth, newHeight);
+        for (BufferLine line : removedLines) {
+            scrollback.addLine(line);
+        }
+        cursor.updateBounds(newHeight, newWidth);
+    }
+
+    // --- Wide character detection ---
+
+    /**
+     * Determines if a character is a wide (double-width) character.
+     * Uses {@link Character#isIdeographic(int)} as a heuristic for CJK characters.
+     */
+    static boolean isWideCharacter(char c) {
+        return Character.isIdeographic(c);
     }
 }
 
