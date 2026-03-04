@@ -1,4 +1,4 @@
-package com.terminalbuffer;
+package com.terminalbuffer.model;
 
 /**
  * Represents text style flags that can be applied to terminal cells.

@@ -1,5 +1,8 @@
-package com.terminalbuffer;
+package com.terminalbuffer.core;
 
+import com.terminalbuffer.model.BufferLine;
+import com.terminalbuffer.model.Cell;
+import com.terminalbuffer.model.CellAttributes;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

@@ -1,4 +1,4 @@
-package com.terminalbuffer;
+package com.terminalbuffer.model;
 
 /**
  * Represents a single character cell in the terminal buffer.

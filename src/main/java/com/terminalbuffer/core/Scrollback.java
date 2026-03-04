@@ -1,4 +1,6 @@
-package com.terminalbuffer;
+package com.terminalbuffer.core;
+
+import com.terminalbuffer.model.BufferLine;
 
 import java.util.ArrayList;
 import java.util.Collections;

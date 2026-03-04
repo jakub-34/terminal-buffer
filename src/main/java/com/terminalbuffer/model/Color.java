@@ -1,4 +1,4 @@
-package com.terminalbuffer;
+package com.terminalbuffer.model;
 
 /**
  * Represents terminal foreground/background colors.

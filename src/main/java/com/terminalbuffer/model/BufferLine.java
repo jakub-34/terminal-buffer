@@ -1,4 +1,4 @@
-package com.terminalbuffer;
+package com.terminalbuffer.model;
 
 import java.util.Arrays;
 

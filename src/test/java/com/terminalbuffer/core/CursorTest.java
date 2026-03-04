@@ -1,4 +1,4 @@
-package com.terminalbuffer;
+package com.terminalbuffer.core;
 
 import org.junit.jupiter.api.Test;
 

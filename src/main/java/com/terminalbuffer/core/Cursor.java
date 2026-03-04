@@ -1,4 +1,4 @@
-package com.terminalbuffer;
+package com.terminalbuffer.core;
 
 /**
  * Tracks the cursor position within the terminal screen.
